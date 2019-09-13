@@ -1,6 +1,6 @@
 {
   "name": "@pihanga/core",
-  "version": "0.3.0",
+  "version": "0.3.7",
   "description": "Core module of the Pihanga framework",
   "homepage": "https://github.com/n1analytics/pihanga#readme",
   "main": "lib/index.js",
@@ -57,8 +57,7 @@
     "numeral": "^2.0.6",
     "path-to-regexp": "^3.0.0",
     "prop-types": "^15.7.2",
-    "react": "^16.9.0",
-    "react-dom": "^16.9.0",
+    "react-redux": "^7.1.0",
     "redux": "^4.0.0",
     "redux-thunk": "^2.3.0",
     "stackinfo": "^1.1.5",
@@ -66,7 +65,7 @@
   },
   "peerDependencies": {
     "react": "^16.9.0-0",
-    "redux": "^2.0.0 || ^3.0.0 || ^4.0.0-0"
+    "react-dom": "^16.9.0-0"
   },
   "devDependencies": {
     "@babel/cli": "^7.5.0",
@@ -85,16 +84,19 @@
     "cross-env": "^5.2.0",
     "cross-spawn": "^6.0.5",
     "es3ify": "^0.2.0",
-    "eslint": "^5.16.0",
-    "eslint-config-prettier": "^4.3.0",
-    "eslint-plugin-import": "^2.18.2",
-    "eslint-plugin-prettier": "^3.1.0",
-    "eslint-plugin-react": "^7.14.3",
+    "eslint": "^6.1.0",
+    "eslint-config-airbnb": "^18.0.1",
+    "eslint-plugin-import": "^2.18.0",
+    "eslint-plugin-jsx-a11y": "^6.2.0",
+    "eslint-plugin-react": "^7.14.0",
+    "eslint-plugin-react-hooks": "^1.7.0",
     "glob": "^7.1.4",
     "jest": "^24.9.0",
     "jest-dom": "^3.5.0",
     "npm-run": "^5.0.1",
     "prettier": "^1.18.2",
+    "react": "^16.9.0",
+    "react-dom": "^16.9.0",
     "react-testing-library": "^5.9.0",
     "rimraf": "^2.7.1",
     "rollup": "^1.19.4",
@@ -110,5 +112,5 @@
       "loose-envify"
     ]
   },
-  "gitHead": "99d03ff4e48796f34fb1dd135647081386b97c8b"
+  "gitHead": "35741e06dae55c7a8e9e12214216f72935af3259"
 }

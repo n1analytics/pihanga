@@ -3,10 +3,10 @@ import React from 'react';
 import { Provider } from 'react-redux';
 import isFunction from 'lodash.isfunction';
 
-import { init as routerInit, navigateToPage, browserHistory } from './router';
+import { init as routerInit, navigateToPage } from './router';
 import { Reducer, createStore } from './redux';
 import { createLogger } from './logger';
-import { registerCards, registerCardComponent } from './card.service';
+import { registerCards, registerMetaCard, registerCardComponent } from './card.service';
 import { config as backendConfig } from './backend';
 
 const logger = createLogger('pihanga:core:start');
@@ -14,6 +14,8 @@ const logger = createLogger('pihanga:core:start');
 const register = {
   cardComponent: registerCardComponent,
   cards: registerCards,
+  metaCard: registerMetaCard,
+  // environment: {}, // overridden in 'start'
 };
 
 export const context2InitFunctions = (ctxt) => {
@@ -22,24 +24,25 @@ export const context2InitFunctions = (ctxt) => {
     return c.init;
   });
   return initFunctions;
+};
+
+function initRouting(rf, opts) {
+  routerInit(rf.reducer, opts);
 }
 
-function initRouting(register, opts) {
-  routerInit(register.reducer, opts);
-}
-
-function initReducer(register) {
+function initReducer(rf) {
   const reducer = new Reducer({});
-  register.reducer = reducer.registerReducer.bind(reducer);
+  // eslint-disable-next-line no-param-reassign
+  rf.reducer = reducer.registerReducer.bind(reducer);
   return reducer;
 }
 
-function initModules(register, { inits, initDirs }) {
+function initModules(rf, { inits }) {
   if (inits) {
     for (const i in inits) {
       const f = inits[i];
       if (isFunction(f)) {
-        f(register);
+        f(rf);
       } else {
         logger.warn('Init function "' + f + '" is not a function.');
       }
@@ -75,8 +78,9 @@ function initPathEvent(opts) {
 }
 
 export const start = (opts) => {
+  register.environment = opts.environment;
   const reducer = initReducer(register, opts);
-  
+
   initRouting(register, opts);
   initModules(register, opts);
 
@@ -93,8 +97,7 @@ export const start = (opts) => {
   const rcf = () => {
     const rc = React.createElement(opts.rootComponent);
     return rc;
-  }
-  const mainComponent = React.createElement(Provider, {store: store}, rcf());
+  };
+  const mainComponent = React.createElement(Provider, { store }, rcf());
   ReactDOM.render(mainComponent, opts.rootEl);
-}
-  
+};
