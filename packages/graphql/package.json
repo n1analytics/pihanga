@@ -1,6 +1,6 @@
 {
   "name": "@pihanga/graphql",
-  "version": "0.1.5",
+  "version": "0.2.2",
   "description": "Implemnts a graphql based backend for local state management",
   "homepage": "https://github.com/n1analytics/pihanga#readme",
   "main": "lib/index.js",
@@ -46,7 +46,7 @@
     "@babel/plugin-transform-react-jsx": "^7.3.0",
     "@babel/plugin-transform-runtime": "^7.5.0",
     "@babel/preset-env": "^7.5.0",
-    "@pihanga/core": "^0.3.11",
+    "@pihanga/core": "^0.4.2",
     "babel-core": "^6.23.0",
     "babel-eslint": "^10.0.2",
     "babel-jest": "^24.9.0",
@@ -88,9 +88,8 @@
     "pretest": "npm run lint",
     "test": "node ./test/run-tests.js",
     "coverage": "codecov",
-    "publish": "npm publish --tag latest --access=public",
+    "x-publish": "npm publish --tag latest --access=public",
     "x-prepublishOnly": "npm run build",
     "x-prepublish": "yarn run lint && yarn run test && yarn run build"
-  },
-  "gitHead": "c2459c308dbfd376545b3682bba4b5c487fd5599"
+  }
 }
