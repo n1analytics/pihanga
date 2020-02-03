@@ -1,6 +1,6 @@
 {
   "name": "@pihanga/core",
-  "version": "0.4.2",
+  "version": "0.4.7",
   "description": "Core module of the Pihanga framework",
   "homepage": "https://github.com/n1analytics/pihanga#readme",
   "main": "lib/index.js",
@@ -24,7 +24,8 @@
     "dist",
     "lib",
     "src",
-    "es"
+    "es",
+    "types"
   ],
   "scripts": {
     "build:commonjs": "cross-env BABEL_ENV=commonjs babel src --out-dir lib && touch lib/DO_NOT_EDIT",
@@ -107,6 +108,7 @@
     "rollup-plugin-terser": "^5.2.4",
     "semver": "^5.7.1"
   },
+  "types": "types/index.d.ts",
   "browserify": {
     "transform": [
       "loose-envify"
