@@ -1,6 +1,9 @@
 
+export declare function addCard(cardName: string, cardDef: {cardType: string} & {[key:string]:string}): void;
 export declare function registerActions(domain: string, names: string[]): {[key:string]:string};
-export function actions(name:string): {[key:string]: string};
+export function actions(name: string): {[key:string]: string};
+export function actions(namespace: string, name:string): string;
+export function action(namespace: string, name:string): string;
 
 export declare function dispatch<T extends ReduxAction>(action: T): void;
 export declare function dispatch<T>(actionType: string, props:  T): void;
@@ -9,10 +12,13 @@ export declare function dispatch(domain: string, actionType: string, props:  {[k
 export declare function dispatchFromReducer<T extends ReduxAction>(action: T): void;
 // export declare function dispatchFromReducer(actionType: string, props:  {[key:string]:any}): void;
 export declare function dispatchFromReducer<T extends {[key:string]:any}>(actionType: string, props: T): void;
-export declare function dispatchFromReducer<T extends {[key:string]:any}>(domain: string, actionType: string, props:  {[key:string]:any}): void;
+export declare function dispatchFromReducer<T extends {[key:string]:any}>(domain: string, actionType: string, props: T): void;
 
 export declare function update(state: ReduxState, path: string[], partial: any): ReduxState;
 
+export declare function getState():ReduxState;
+export declare function getPihangaState<T>(name: string, state?: ReduxState): T;
+export declare function updatePihangaState(state: ReduxState, name: string, path: string[], partial: any): ReduxState;
 
 export declare function registerGET(props: PiRegisterGetProps): void;
 export declare function registerPUT(props: PiRegisterPutProps): void;
@@ -20,6 +26,13 @@ export declare function registerPOST(props: PiRegisterPostProps): void;
 
 export declare function getCardState(cardName:string, state: ReduxState): PiCardState;
 export declare function createLogger(name:string):any;
+export declare function getParamValue(
+  paramName: string,  
+  cardName: string, 
+  state: ReduxState, 
+  ctxtProps?: {[k: string]: unknown}, 
+  includeDefaults?: boolean,
+)
 
 type ReactComponent = any; //({[key:string]:any}) => any
 type ReduxState = {
@@ -52,7 +65,7 @@ interface PiRegister {
    */
   metaCard(type: string, transformF: PiMetaTransformerF): void;
 
-  reducer<S extends ReduxState, A extends ReduxAction>(eventType: string, mapper: (state: S, action: A) => S): void,
+  reducer<S extends ReduxState, A extends ReduxAction>(eventType: string, mapper: (state: S, action: A) => S, priority?: number): void,
 }
 
 type PiRegisterComponent = {
@@ -74,8 +87,10 @@ type PiRegisterGetProps = {
   name: string,
   url: string,
   trigger: string,
-  request: (action: ReduxAction) => PiUrlBindings,
+  guard?: (action: ReduxAction, state: ReduxState) => boolean,
+  request: (action: ReduxAction, state: ReduxState, variables: string[]) => PiUrlBindings,
   reply: (state: ReduxState, reply: any, requestAction: ReduxAction) => ReduxState,
+  error: (state: ReduxState, reply: any, requestAction: ReduxAction) => ReduxState,
 };
 
 type PiRegisterPostProps = PiRegisterPostPutProps;
@@ -84,6 +99,8 @@ type PiRegisterPostPutProps = {
   name: string,
   url: string,
   trigger: string,
-  request: (action: ReduxAction) => [PiRestRequestBody, PiUrlBindings],
+  guard?: (action: ReduxAction, state: ReduxState) => boolean,
+  request: (action: ReduxAction, state: ReduxState, variables: string[]) => [PiRestRequestBody, PiUrlBindings],
   reply: (state: ReduxState, reply: any, requestAction: ReduxAction) => ReduxState,
+  error: (state: ReduxState, reply: any, requestAction: ReduxAction) => ReduxState,
 };

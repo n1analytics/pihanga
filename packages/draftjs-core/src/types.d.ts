@@ -1,9 +1,16 @@
-declare module "draftjs-utils" {
-  import {EditorState} from 'draft-js';
+declare module 'draftjs-utils' {
+  import { EditorState } from 'draft-js';
 
   export function addLineBreakRemovingSelection(editorState: EditorState): EditorState;
   export function changeDepth(editorState: EditorState, adjustment: number, maxDepth: number): EditorState;
 }
+
+// declare module 'sha1-es' {
+//   type X = {
+//     hash: (str: string) => string;
+//   };
+//   export const default: X;
+// }
 
 // declare module 'draft_js'  {
 //   import {DraftEntityType, DraftEntityMutability} from 'draft-js';
@@ -16,9 +23,9 @@ declare module "draftjs-utils" {
 //   // }
 // }
 
-type ClassedProps<P> = P & { 
-  classes: {[name:string]:string}, 
-  children?: React.ReactNode 
+type ClassedProps<P> = P & {
+  classes: {[name: string]: string};
+  children?: React.ReactNode;
 };
 
 // defined in @types/draft-js, but apparently not exported

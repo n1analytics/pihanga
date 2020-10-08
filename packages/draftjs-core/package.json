@@ -1,6 +1,6 @@
 {
   "name": "@pihanga/draftjs-core",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Wrapping and extending draft-js in the Pihanga framework",
   "license": "MIT",
   "author": "Max Ott <max@winlab.rutgers.edu> (http://linkedin.com/in/max-ott)",
@@ -14,19 +14,24 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
-    "build": "rm -rf ./lib && tsc && cp src/editor/draft.css lib/editor",
+    "compile": "tsc",
+    "build2": "rm -rf ./lib && tsc",
+    "build": "rm -rf ./lib && copyup 'src/**/*.js' ./lib && copyup 'src/**/*.css' ./lib && tsc",
     "lint": "eslint \"src/**\"",
     "test": "jest --config jestconfig.json",
-    "prepare": "npm run build",
-    "x-prepublishOnly": "npm test && npm run lint",
-    "x-preversion": "npm run lint"
+    "prepare": "yarn build",
+    "x-prepublishOnly": "yarn test && yarn lint",
+    "x-preversion": "yarn lint"
   },
   "dependencies": {
     "draft-js": "^0.11.0",
     "draftjs-utils": "^0.10.0",
     "immutable": "^4.0.0-rc.12",
+    "json-canonicalize": "^1.0.3",
     "react-dnd": "^10.0.0",
-    "react-dnd-html5-backend": "^10.0.0"
+    "react-dnd-html5-backend": "^10.0.0",
+    "sha1-es": "^1.8.2",
+    "uuid": "^8.1.0"
   },
   "peerDependencies": {
     "@material-ui/core": "^4.6.0-0",
@@ -37,14 +42,16 @@
   },
   "devDependencies": {
     "@material-ui/core": "^4.6.0",
-    "@pihanga/core": "^0.4.7",
-    "@pihanga/material-ui": "^0.4.7",
+    "@pihanga/core": "^0.5.0",
+    "@pihanga/material-ui": "^0.5.0",
     "@types/draft-js": "^0.10.37",
     "@types/immutable": "^3.8.7",
     "@types/jest": "^25.1.0",
     "@types/react": "^16.9.0",
+    "@types/uuid": "^8.0.0",
     "@typescript-eslint/eslint-plugin": "^2.18.0",
     "@typescript-eslint/parser": "^2.18.0",
+    "copyfiles": "^2.3.0",
     "eslint": "^6.8.0",
     "eslint-config-airbnb": "^18.0.1",
     "eslint-plugin-import": "^2.20.0",
@@ -62,5 +69,6 @@
   },
   "files": [
     "lib/**/*"
-  ]
+  ],
+  "gitHead": "835ca3baeff25dd04206c77ed6078e49084ea110"
 }

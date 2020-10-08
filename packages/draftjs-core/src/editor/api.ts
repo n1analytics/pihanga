@@ -1,11 +1,8 @@
 import {
-  registerActions,
   update,
   dispatch,
-  dispatchFromReducer,
   getCardState,
   ReduxState,
-  PiRegister,
   createLogger,
   ReduxAction,
 } from '@pihanga/core';
@@ -16,22 +13,34 @@ import {
   SelectionState,
   DraftHandleValue,
   ContentBlock,
+  DraftDragType,
 } from 'draft-js';
 
 import {
-  EditorComponent,
   BlockType2Renderer,
+  Exts,
   HandleReturnExtensions,
   HandleBeforeInputExtensions,
   HandleKeyCommandExtensions,
+  KeyBindingFnExtensions,
+  HandleDropExtensions,
+  HandleDroppedFilesExtensions,
+  HandlePastedFilesExtensions,
+  HandlePastedTextExtensions,
 } from './editor.component';
-import Decorator, { DECORATORS } from './decorator';
-import { createContentState, persistState } from './persist';
-import { initializeCatalog, getCatalog } from '../util';
-// the following is weird but required by Create React App forcing "isolatedModules": true in tsconfig to true
+
+import { getCatalog } from '../util';
+// the following is weird but required by Create React App forcing "isolatedModules": true
+// in tsconfig to true
 // See https://github.com/facebook/create-react-app/issues/6054
-import { DecoratorDeclaration as DD, DecorationMapper as DM, DecoratorClassDef as DC } from './decorator';
+import {
+  DECORATORS,
+  DecoratorDeclaration as DD,
+  DecorationMapper as DM,
+  DecoratorClassDef as DC,
+} from './decorator';
 import { ACTION_TYPES } from '.';
+import { PersistedState } from './persist';
 
 const logger = createLogger('PiEditor');
 
@@ -43,18 +52,22 @@ export type DecoratorDeclaration = DD;
 export type DecorationMapper = DM;
 export type DecoratorClassDef = DC;
 
-export { default as handleReturn } from './handleReturn';
-
 // defined in @types/draft-js, but apparently not exported
 export type SyntheticKeyboardEvent = React.KeyboardEvent<{}>;
+
+// Document we are loadinginto editor
+export type DocumentRxState = {
+  title?: string;
+  content: PersistedState;
+}
 
 export type PiEditorRxState = {
   editorID: string;
   documentID?: string;
   autoSave?: boolean;
   catalogKey?: string;
-  stateSaved?: boolean;
-  stateLastSaved?: number;
+  stateSaveRequestedAt: number;
+  stateSavedAt?: number;
   saveIntervalMS?: number; // msec to wait before persisting current editor state
   plugins?: unknown;
   editorState?: EditorState;
@@ -76,52 +89,159 @@ export type PiEditorAction = ReduxAction & {
 export type PiEditorActionOpen = PiEditorAction & {
 };
 
+export type PiEditorActionOpenNew = ReduxAction & {
+  editorID: string;
+  documentID?: string;
+  title?: string;
+  content: PersistedState;
+};
+
 export type PiEditorActionLoad = PiEditorAction & {
 };
 
 export type PiEditorActionUpdate = PiEditorAction & {
+  editorID: string;
+  documentID: string;
   editorState: EditorState;
   blocksChanged: string[];
+  entitiesHaveChanged: boolean;
+  isPasted: boolean;
+  isFocused: boolean;
+  autoSave?: boolean;
+  saveIntervalMS?: number;
+  selHasChanged: boolean;
+  selection?: {
+    anchor: {
+      key: string;
+      offset: number;
+    };
+    focus: {
+      key: string;
+      offset: number;
+    };
+    hasFocus: boolean;
+  };
 };
 
 export type PiEditorActionSave = PiEditorAction & {
   editorID: string;
 };
 
-export type PiEditorExtension = {
-  handleReturn?: HandleReturnFn;
-  handleBeforeInput?: HandleBeforeInputFn<any>;
-  handleKeyCommand?: HandleKeyCommandFn;
+export type PiEditorFocusEvent = {
+  editorID: string;
 };
 
-export type HandleReturnFn = (
+export type PiEditorFocusAction = ReduxAction & PiEditorFocusEvent;
+
+export type PiEditorExtension<P> = {
+  handleReturn?: HandleReturnFn<P>;
+  handleBeforeInput?: HandleBeforeInputFn<P>;
+  handleKeyCommand?: HandleKeyCommandFn<P>;
+  handleKeyBinding?: HandleKeyBindingFn<P>;
+  handlePastedText?: HandlePastedTextFn<P>;
+  handlePastedFiles?: HandlePastedFilesFn<P>;
+  handleDroppedFiles?: HandleDroppedFilesFn<P>;
+  handleDrop?: HandleDropFn<P>;
+};
+
+export type HandleReturnFn<P> = (
   event: SyntheticKeyboardEvent,
   eState: EditorState,
   readOnly: boolean, // default read only
-  extProps: unknown
+  editorID: string,
+  extProps?: P,
 ) => [boolean, EditorState];
 
 export type HandleBeforeInputFn<P> = (
   chars: string,
   eState: EditorState,
   readOnly: boolean, // default read only
-  extProps: P,
+  editorID: string,
+  extProps?: P,
 ) => [DraftHandleValue|undefined, EditorState];
 
-export type HandleKeyCommandFn = (
+export type HandlePastedTextFn<P> = (
+  text: string,
+  html: string | undefined,
+  eState: EditorState,
+  readOnly: boolean, // default read only
+  editorID: string,
+  extProps?: P,
+) => [DraftHandleValue|undefined, EditorState];
+
+export type HandlePastedFilesFn<P> = (
+  files: Array<Blob>,
+  editorID: string,
+  readOnly: boolean, // default read only
+  extProps?: P,
+) => DraftHandleValue|undefined;
+
+export type HandleDroppedFilesFn<P> = (
+  selection: SelectionState,
+  files: Array<Blob>,
+  editorID: string,
+  readOnly: boolean, // default read only
+  extProps?: P,
+) => DraftHandleValue|undefined;
+
+export type HandleDropFn<P> = (
+  selection: SelectionState,
+  dataTransfer: any,
+  isInternal: DraftDragType,
+  editorID: string,
+  readOnly: boolean, // default read only
+  extProps?: P,
+) => DraftHandleValue|undefined;
+
+export type HandleKeyCommandFn<P> = (
   command: string,
   eState: EditorState,
   readOnly: boolean, // default read only
-  extProps: unknown
-) => [DraftHandleValue|undefined, EditorState]
+  editorID: string,
+  extProps?: P,
+) => [DraftHandleValue|undefined, EditorState];
+
+export type HandleKeyBindingFn<P> = (
+  e: SyntheticKeyboardEvent,
+  eState: EditorState,
+  editorID: string,
+  extProps?: P,
+) => [boolean, string | null, EditorState];
 
 export type BlockRendererFn<P, T extends PiComponentProps> = (
   block: ContentBlock,
-  editorID: string,
-  documentID: string,
-  readOnly: boolean, // editor's default setting
+  editorName: string,
   extProps: P,
+  editorProps: {
+    documentID: string;
+    readOnly: boolean;
+    autoSave: boolean;
+    saveIntervalMS?: number;
+    stateSavedAt?: number;
+    withSpellCheck: boolean; // true,
+    plugins: any[];
+    extensions: {[key: string]: unknown};
+  },
+  isFocused: boolean,
 ) => BlockRenderDef<T> | null;
+
+/**
+ * API to implement for a custom block render component defined above
+ */
+export type BlockRenderComponentProps<P> = {
+  contentState: ContentState;
+  block: ContentBlock;
+  blockProps: P;
+  selection: SelectionState;
+  // blockStyleFn: ƒ blockStyleFn()
+  // customStyleMap: {BOLD: {…}, CODE: {…}, ITALIC: {…}, STRIKETHROUGH: {…}, UNDERLINE: {…}}
+  // customStyleFn: undefined
+  // decorator: {getDecorations: ƒ, getComponentForKey: ƒ, getPropsForKey: ƒ}
+  // direction: "LTR"
+  // forceSelection: false
+  // offsetKey: "4f9lk-0-0"
+};
+export type BlockRenderComponent<P> = React.FC<BlockRenderComponentProps<P>>;
 
 export type BlockRenderDef<T extends PiComponentProps> = {
   component: React.FunctionComponent<T>; // BlockRenderOpts
@@ -141,8 +261,14 @@ export type PiComponentProps = {[key: string]: unknown};
  * FUNCTIONS
  */
 
-export function getEditorRedux<S extends ReduxState>(editorID: string, state: S): PiEditorRxState {
-  const rs = state[editorID] as PiEditorRxState;
+export function getEditorRedux<S extends ReduxState>(
+  editorID: string,
+  state: S,
+): PiEditorRxState {
+  // SOrry for the type gymnastics
+  const as = (state as unknown) as {[key: string]: {[key: string]: unknown}};
+  const p = as.pihanga[editorID] as {[key: string]: unknown};
+  const rs = { ...as[editorID], ...p } as PiEditorRxState;
   return rs;
 }
 
@@ -173,10 +299,10 @@ export function updateEditorStateInRedux<S extends ReduxState>(
   if (editorState === rs.editorState) {
     return state;
   } else {
-    setTimeout(() => {
-      reportEditorStateUpdate(editorState, rs.editorState, editorID, rs.documentID);
-    }, 0);
-    return update(state, [editorID], { editorState }) as S;
+    // setTimeout(() => {
+    //   reportEditorStateUpdate(editorState, rs.editorState, editorID, rs.documentID);
+    // }, 0);
+    return update(state, ['pihanga', editorID], { editorState }) as S;
   }
 }
 
@@ -273,20 +399,50 @@ export function registerBlockRenderer(type: string, renderFn: BlockRendererFn<an
   bt2r[type] = renderFn;
 }
 
-export function registerExtensions(name: string, extensions: PiEditorExtension): void {
-  if (extensions.handleReturn) {
-    const re = HandleReturnExtensions;
-    re.unshift({ name, f: extensions.handleReturn });
+export function registerExtensions<P>(
+  name: string,
+  extensions: PiEditorExtension<P>,
+  priority = 500,
+): void {
+  function add<P>(f: P, extA: Exts<any>) {
+    if (f) {
+      const re = extA;
+      re.push({ name, priority, f });
+      re.sort((a, b) => b.priority - a.priority);
+    }
   }
-  if (extensions.handleBeforeInput) {
-    const ha = HandleBeforeInputExtensions;
-    ha.unshift({ name, f: extensions.handleBeforeInput });
-  }
-  if (extensions.handleKeyCommand) {
-    const ha = HandleKeyCommandExtensions;
-    ha.unshift({ name, f: extensions.handleKeyCommand });
-  }
+
+  add(extensions.handleReturn, HandleReturnExtensions);
+  add(extensions.handleBeforeInput, HandleBeforeInputExtensions);
+  add(extensions.handleKeyCommand, HandleKeyCommandExtensions);
+  add(extensions.handleKeyBinding, KeyBindingFnExtensions);
+  add(extensions.handlePastedText, HandlePastedTextExtensions);
+  add(extensions.handlePastedFiles, HandlePastedFilesExtensions);
+  add(extensions.handleDrop, HandleDropExtensions);
+  add(extensions.handleDroppedFiles, HandleDroppedFilesExtensions);
+
+  // if (extensions.handleReturn) {
+  //   const re = HandleReturnExtensions;
+  //   re.push({ name, priority, f: extensions.handleReturn });
+  //   re.sort((a, b) => b.priority - a.priority);
+  // }
+  // if (extensions.handleBeforeInput) {
+  //   const ha = HandleBeforeInputExtensions;
+  //   ha.push({ name, priority, f: extensions.handleBeforeInput });
+  //   ha.sort((a, b) => b.priority - a.priority);
+  // }
+  // if (extensions.handleKeyCommand) {
+  //   const ha = HandleKeyCommandExtensions;
+  //   ha.push({ name, priority, f: extensions.handleKeyCommand });
+  //   ha.sort((a, b) => b.priority - a.priority);
+  // }
+  // if (extensions.handleKeyBinding) {
+  //   const ha = KeyBindingFnExtensions;
+  //   ha.push({ name, priority, f: extensions.handleKeyBinding });
+  //   ha.sort((a, b) => b.priority - a.priority);
+  // }
 }
+
 
 export function removeSelection(
   eState: EditorState,

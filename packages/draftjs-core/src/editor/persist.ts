@@ -1,3 +1,4 @@
+import { createLogger } from '@pihanga/core';
 import {
   convertToRaw,
   convertFromRaw,
@@ -9,8 +10,12 @@ import {
   DraftEntityMutability,
 } from 'draft-js';
 import { OrderedSet } from 'immutable';
+import { canonicalize } from 'json-canonicalize';
 
 import { getCatalog, initializeCatalog } from '../util';
+import sha1 from './sha1';
+
+const logger = createLogger('PiEditor:persist');
 
 type B = {
   key: string;
@@ -28,9 +33,16 @@ type E = {
   data?: {[key: string]: any};
 };
 
-type PersistedState = {
+type H = {
+  blocks: {[blockKey: string]: string};
+  entities: {[entityKey: string]: string};
+};
+
+export type PersistedState = {
   blocks: B[];
-  entities: {[key: string]: E};
+  entities?: {[key: string]: E};
+  hashes?: H;
+  lastSaved?: number;
 }
 
 const FORMATTING_ENTITIES = ['BOLD', 'ITALIC'];
@@ -59,34 +71,48 @@ export const persistState = (editorState: EditorState): PersistedState => {
     return n;
   });
 
-  const blocks = raw.blocks.map((b) => {
+  const b2h = {} as {[key: string]: string};
+  const blocks = raw.blocks.map((b, i) => {
     if (b.data) {
       const d = b.data as {CATALOG_KEY: string};
       delete d.CATALOG_KEY;
     }
-    return {
+    const inlineStyleRanges = b.inlineStyleRanges
+      .filter((s) => active.has(s.style))
+      .map((s) => ({ ...s, style: key2name[s.style] || s.style }));
+    const bs = {
       key: b.key,
-      inlineStyleRanges: b.inlineStyleRanges.filter((s) => active.has(s.style)),
+      inlineStyleRanges,
       data: b.data as {[key: string]: any},
       depth: b.depth,
       text: b.text,
       type: b.type,
     } as B;
+    b2h[b.key] = sha1(canonicalize(bs));
+    return bs;
   });
   const entities = {} as {[key: string]: E};
-  active.sort().forEach((ek) => {
+  const e2h = {} as {[key: string]: string};
+  active.sort().forEach((_ek) => {
+    const ek = _ek!;
     // if (FORMATTING_ENTITIES.includes(ek!)) {
     //   return;
     // }
-    const e = contentState.getEntity(ek!);
-    entities[ek!] = {
-      name: key2name[ek!],
+    const e = contentState.getEntity(ek);
+    const eid = key2name[ek];
+    const es = {
       type: e.getType(),
       mutability: e.getMutability() as string,
       data: e.getData() as {[key: string]: any},
     } as E;
+    entities[eid] = es;
+    e2h[eid] = sha1(canonicalize(es));
   });
-  return { blocks, entities };
+  const hashes = { blocks: b2h, entities: e2h };
+  const lastSaved = Date.now();
+  return {
+    blocks, entities, hashes, lastSaved,
+  };
 };
 
 export const createContentState = (
@@ -99,12 +125,17 @@ export const createContentState = (
     entityMap: {},
   });
   const [catKey, cs2] = initializeCatalog(cs);
-  const old2new = {} as {[key: string]: string};
+  if (!ctnt.entities) {
+    // no entities to process. All done.
+    const keys = cs2.getBlockMap().keySeq().toArray();
+    return [cs2, catKey, keys];
+  }
+  // const old2new = {} as {[key: string]: string};
   const catData = {} as {[key: string]: string};
   const cs3 = Object.entries(ctnt.entities).reduce((csi, el) => {
     const [key, ed] = el;
     const cso = csi.createEntity(ed.type, ed.mutability as DraftEntityMutability, ed.data);
-    old2new[key] = catData[ed.name] = cs.getLastCreatedEntityKey();
+    catData[key] = cs.getLastCreatedEntityKey();
     return cso;
   }, cs2);
   const cs4 = cs3.replaceEntityData(catKey, catData);
@@ -115,7 +146,15 @@ export const createContentState = (
     const ccm = cache.get(cm!);
     if (ccm) return ccm;
 
-    const style = cm!.getStyle().map((k) => old2new[k!]) as OrderedSet<string>;
+    const style = cm!.getStyle().flatMap((k) => {
+      const e = ctnt.entities ? ctnt.entities[k!] : null;
+      if (!e) {
+        logger.warn(`Missing entity '${k}'`);
+      }
+      const n = catData[k!];
+      const t = e ? `${e.type}_T` : 'UNKNOWN_T';
+      return [n, t];
+    }) as OrderedSet<string>;
     const cm2 = CharacterMetadata.create({ style });
     cache.set(cm!, cm2);
     return cm2;
@@ -130,5 +169,7 @@ export const createContentState = (
       data,
     });
   });
-  return [cs4.set('blockMap', bm2) as ContentState, catKey, newBlocks];
+  const cs5 = cs4.set('blockMap', bm2) as ContentState;
+  const raw = convertToRaw(cs5);
+  return [cs5, catKey, newBlocks];
 };

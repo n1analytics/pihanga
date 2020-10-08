@@ -3,12 +3,13 @@ import isFunction from 'lodash.isfunction';
 import { connect } from 'react-redux';
 import { getState, registerActions } from './redux';
 import { createLogger } from './logger';
+import { errorMonitor } from 'form-data';
 
 const logger = createLogger('card.service');
 
-// const cards = {};
-const cards2 = {};
+const cards = {};
 const metaCards = {};
+const metaCard2cards = {}; // mapping from instantiated meta cards to their respective cards
 const cardComponents = {};
 
 /**
@@ -31,15 +32,15 @@ export function registerMetaCard(type, transformF) {
 
 export function registerCards(newCards) {
   Object.keys(newCards).forEach((k) => {
-    if (cards2[k]) {
+    if (cards[k]) {
       logger.warn(`Overwriting card "${k}"`);
     }
     const cardDef = { ...newCards[k] };
-    registerSingleCard(k, cardDef);
+    addCard(k, cardDef);
   });
 }
 
-function registerSingleCard(cardName, cardDef) {
+export function addCard(cardName, cardDef) {
   const { cardType } = cardDef;
   if (!cardType) {
     logger.error(`Reject registration of card "${cardName}" due to missing "cardType"`);
@@ -65,10 +66,22 @@ function registerSingleCard(cardName, cardDef) {
     }
     return p;
   }, { props: {}, eventProps: {} });
-  cards2[cardName] = {
-    cardType, props, eventProps, events, defaults,
+  cards[cardName] = {
+    cardType, props, eventProps, events, defaults, childCards: [],
   };
   // cards[cardName] = cardDef;
+}
+
+export function removeCard(cardName) {
+  if (metaCard2cards[cardName]) {
+    metaCard2cards[cardName].forEach((cn) => removeCard(cn));
+    delete metaCard2cards[cardName];
+    return;
+  }
+
+  if (!(delete cards[cardName])) {
+    logger.warn(`Attempting to remove unknown card '${cardName}'.`);
+  }
 }
 
 export function expandMetaCard(cardType, cardName, cardDef) {
@@ -79,6 +92,7 @@ export function expandMetaCard(cardType, cardName, cardDef) {
     return;
   }
   const newCards = transform(cardName, cardDef);
+  metaCard2cards[cardName] = Object.keys(newCards);
   registerCards(newCards);
 }
 
@@ -116,12 +130,12 @@ export function ref(cardNameOrF, paramName) {
         return vd;
       }
     }
-    const refDef = cards2[cardName];
+    const refDef = cards[cardName];
     if (!refDef) {
       logger.warn(`Requested reference to unknown card "${cardName}"`);
       return null;
     }
-    const v = getValue(paramName, refDef.props || {}, state, ctxtProps);
+    const v = getValue(paramName, refDef.props || {}, state, ctxtProps, cardName);
     return v;
   };
 }
@@ -155,7 +169,7 @@ export function pQuery(cardName, propName, match, resProps) {
     const cName = isFunction(cardName) ? cardName(s) : cardName;
     const pName = isFunction(propName) ? propName(s) : propName;
     const matchIsFunction = isFunction(match);
-    const cardNames = cName ? [cName] : Object.keys(cards2);
+    const cardNames = cName ? [cName] : Object.keys(cards);
     const result = [];
     const addResult = (cn, pn, v) => {
       const params = { cardName: cn };
@@ -195,13 +209,53 @@ export function pQuery(cardName, propName, match, resProps) {
   };
 }
 
-function getValue(paramName, cardDef, state, ctxtProps = {}) {
-  let v = cardDef[paramName];
+export function getParamValue(paramName, cardName, state, ctxtProps = {}, includeDefaults = true) {
+  const cache = cardStates[cardName] || {};
+  if (cache.state === state) {
+    return cache.cardState[paramName];
+  }
+ 
+  const cardDef = cards[cardName];
+  if (!cardDef) {
+    throw new Error(`Unknonw card '${cardName}'`);
+  }
+
+  // Step 1: Dynamic value in state.pihanga
+  const dynState = state.pihanga[cardName];
+  if (dynState) {
+    const vd = dynState[paramName];
+    if (vd !== undefined) {
+      return vd;
+    }
+  }
+
+  // Step 2: Static definition
+  let v = ctxtProps[paramName];
+  if (typeof v === 'undefined') {
+    v = cardDef.props[paramName]; // need to avoid boolean
+  }
+  // Step 3: Use defaults
+  if (typeof v === 'undefined' && includeDefaults && cardDef.defaults) {
+    v = cardDef.defaults[paramName];
+  }
   if (isFunction(v)) {
     v = v(state, (cn, pn) => {
-      const rv = ref(cn, pn)(state, ctxtProps);
+      const cn2 = cn || cardName;
+      const rv = getParamValue(pn, cn2, state, ctxtProps, cn2 !== cardName);
       return rv;
-    }, ctxtProps);
+    }, {}, cardName);
+  }
+  return v;
+}
+
+function getValue(paramName, cardDef, state, ctxtProps, cardName) {
+  let v = ctxtProps[paramName];
+  if (typeof v === 'undefined') v = cardDef[paramName]; // need to avoid boolean
+  if (isFunction(v)) {
+    v = v(state, (cn, pn) => {
+      const rv = ref(cn || cardName, pn)(state, ctxtProps);
+      return rv;
+    }, ctxtProps, cardName);
   }
   return v;
 }
@@ -227,7 +281,7 @@ export const Card = (props) => {
 };
 
 const createConnectedCard = (cardName, ctxtProps) => {
-  const cardDef = cards2[cardName];
+  const cardDef = cards[cardName];
   if (!cardDef) {
     return null;
   }
@@ -263,12 +317,23 @@ const createConnectedCard = (cardName, ctxtProps) => {
           } else {
             // set default event handler
             f = (opts = {}) => {
-              dispatch({
-                type: evtType,
-                id: cardName, // DEPRECATE
-                cardID: cardName,
-                ...opts,
-              });
+              let o = opts;
+              if ('type' in o) {
+                logger.error(`event options for "${evtType}" from "${cardName}" cannot not include "type". Will change to "_type"`);
+                o = {
+                  _type: opts.type,
+                  ...opts,
+                };
+                delete o.type;
+              }
+              setTimeout(() => {
+                dispatch({
+                  type: evtType,
+                  // id: cardName, // DEPRECATE
+                  cardID: cardName,
+                  ...o,
+                });
+              }, 0);
             };
           }
           h[name] = f;
@@ -285,7 +350,7 @@ const createConnectedCard = (cardName, ctxtProps) => {
 };
 
 const UnknownCard = (cardName) => {
-  const s = `Unknown card "${cardName}" - (${Object.keys(cards2).join(', ')})`;
+  const s = `Unknown card "${cardName}" - (${Object.keys(cards).join(', ')})`;
   return React.createElement('div', null, s);
 };
 
@@ -304,7 +369,7 @@ export function getCardState(cardName, state, ctxtProps = {}) {
   }
 
   // const cardDef = cards[cardName];
-  const cardDef2 = cards2[cardName];
+  const cardDef2 = cards[cardName];
   if (!cardDef2.cardType) {
     return undefined;
   }
@@ -313,7 +378,7 @@ export function getCardState(cardName, state, ctxtProps = {}) {
   const oldCardState = cache.cardState || {};
   let hasChanged = false;
   for (const k of Object.keys(cardState)) {
-    const v = getValue(k, cardState, state, ctxtProps);
+    const v = getValue(k, cardState, state, ctxtProps, cardName);
     const ov = oldCardState[k];
     // As redux and related state is supposed to be close to immutable
     // a simple equivalence check should suffice.
@@ -327,6 +392,7 @@ export function getCardState(cardName, state, ctxtProps = {}) {
     }
     cardState[k] = v;
   }
+  // console.log('>>> CARD STATE', cardName, hasChanged, cardState);
   if (hasChanged) {
     cardState.cardName = cardName;
     cacheCardState(cardName, cardState, state, ctxtProps);

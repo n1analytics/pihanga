@@ -24,7 +24,7 @@ const registerMethod = (method, opts) => {
   const {
     name,
     url,
-    trigger,
+    trigger, guard,
     request, reply, error,
   } = opts;
 
@@ -49,12 +49,40 @@ const registerMethod = (method, opts) => {
   const submitType = `${ACTION_TYPES[`${method}_SUBMITTED`]}:${name}`;
   const resultType = `${ACTION_TYPES[`${method}_RESULT`]}:${name}`;
   const errorType = `${ACTION_TYPES[`${method}_ERROR`]}:${name}`;
+  const intErrorType = `${ACTION_TYPES[`${method}_INTERNAL_ERROR`]}:${name}`;
 
   registerReducer(trigger, (state, action) => {
-    const [body, vars] = request(action, state, variables);
+    if (guard) {
+      if (!guard(action, state)) {
+        return state;
+      }
+    }
+    let r;
+    try {
+      r = request(action, state, variables);
+    } catch (e) {
+      dispatchFromReducer({
+        type: intErrorType,
+        call: 'request',
+        // eslint-disable-next-line object-property-newline
+        action, state, variables,
+        error: e,
+      });
+    }
+    const [body, vars] = r;
     if (body) {
       const url2 = buildURL(parts, vars, variables);
-      runMethod(method, url2, name, body, vars, resultType, errorType, action);
+      try {
+        runMethod(method, url2, name, body, vars, resultType, errorType, action);
+      } catch (e) {
+        dispatchFromReducer({
+          type: intErrorType,
+          call: 'runMethod',
+          // eslint-disable-next-line object-property-newline
+          method, url2, name, body, vars, resultType, errorType, action,
+          error: e,
+        });
+      }
       // eslint-disable-next-line object-curly-newline
       dispatchFromReducer({
         type: submitType,
@@ -70,7 +98,7 @@ const registerMethod = (method, opts) => {
   registerReducer(resultType, (state, action) => reply(state, action.reply, action.requestAction));
 
   if (error) {
-    registerReducer(errorType, (state, action) => reply(state, action.error, action.requestAction));
+    registerReducer(errorType, (state, action) => error(state, action.error, action.requestAction));
   }
 };
 
@@ -108,10 +136,11 @@ export const runMethod = (
   fetchApi(url, {
     method,
     body,
-  }).then((reply) => {
+  }).then(([reply, contentType]) => {
     const p = {
       type: resultType,
       restName: name,
+      contentType,
       reply,
       vars,
       requestAction,
@@ -122,7 +151,8 @@ export const runMethod = (
       type: errorType,
       restName: name,
       error: {
-        error,
+        error: error.toString(),
+        stack: error.stack,
         url,
         vars,
       },

@@ -1,6 +1,6 @@
 {
   "name": "@pihanga/core",
-  "version": "0.4.7",
+  "version": "0.5.0",
   "description": "Core module of the Pihanga framework",
   "homepage": "https://github.com/n1analytics/pihanga#readme",
   "main": "lib/index.js",
@@ -32,7 +32,8 @@
     "build:es": "babel src --out-dir dist/es",
     "build:umd": "cross-env NODE_ENV=development rollup -c -o dist/pihanga-core.js",
     "build:umd:min": "cross-env NODE_ENV=production rollup -c -o dist/pihanga-core.min.js",
-    "build": "npm run build:commonjs && npm run build:es && npm run build:umd && npm run build:umd:min",
+    "build": "npm run build:commonjs && npm run build:es",
+    "x-build": "npm run build:commonjs && npm run build:es && npm run build:umd && npm run build:umd:min",
     "clean": "rimraf dist coverage",
     "format": "prettier --write \"{src,test}/**/*.{js,ts}\" index.d.ts \"docs/**/*.md\"",
     "lint": "eslint src test/utils test/components",
@@ -46,6 +47,7 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.5.5",
+    "form-data": "^3.0.0",
     "history": "^4.9.0",
     "humanize-duration": "^3.20.1",
     "lodash.every": "^4.6.0",
@@ -113,5 +115,6 @@
     "transform": [
       "loose-envify"
     ]
-  }
+  },
+  "gitHead": "b6072b484fb23e64930847c2cad18f53126f3f39"
 }

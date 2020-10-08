@@ -1,6 +1,6 @@
 {
   "name": "@pihanga/draftjs-plugins",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A set of plugins for the Pihanga draft-js editor",
   "license": "MIT",
   "author": "Max Ott <max@winlab.rutgers.edu> (http://linkedin.com/in/max-ott)",
@@ -14,15 +14,17 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
+    "compile": "yarn build",
     "build": "rm -rf ./lib && tsc",
     "lint": "eslint \"src/**\"",
     "test": "jest --config jestconfig.json",
-    "prepare": "npm run build",
-    "x-prepublishOnly": "npm test && npm run lint",
-    "x-preversion": "npm run lint"
+    "prepare": "yarn build",
+    "x-prepublishOnly": "yarn test && yarn lint",
+    "x-preversion": "yarn lint"
   },
   "dependencies": {
-    "@pihanga/draftjs-core": "^0.0.8",
+    "@pihanga/draftjs-core": "^0.2.0",
+    "draftjs-utils": "^0.10.0",
     "immutable": "^4.0.0-rc.12",
     "valid-url": "^1.0.0"
   },
@@ -37,14 +39,15 @@
   "devDependencies": {
     "@material-ui/core": "^4.6.0",
     "@material-ui/lab": "^4.0.0-alpha.36",
-    "@pihanga/core": "^0.4.7",
-    "@pihanga/material-ui": "^0.4.7",
+    "@pihanga/core": "^0.5.0",
+    "@pihanga/material-ui": "^0.5.0",
     "@types/draft-js": "^0.10.37",
     "@types/immutable": "^3.8.7",
     "@types/jest": "^25.1.0",
     "@types/react": "^16.9.0",
     "@typescript-eslint/eslint-plugin": "^2.18.0",
     "@typescript-eslint/parser": "^2.18.0",
+    "draft-js": "^0.11.0",
     "eslint": "^6.8.0",
     "eslint-config-airbnb": "^18.0.1",
     "eslint-plugin-import": "^2.20.0",
@@ -61,5 +64,6 @@
   "files": [
     "lib/**/*",
     "src/**/*"
-  ]
+  ],
+  "gitHead": "835ca3baeff25dd04206c77ed6078e49084ea110"
 }
