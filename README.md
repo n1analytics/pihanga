@@ -1,3 +1,5 @@
+## This is way out of data - the new home for Pihanga is https://github.com/data61/pihanga
+
 Pihanga - Framework for dynamically extendible React apps
 ===
 
